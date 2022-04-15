@@ -1,8 +1,17 @@
-build:
-	docker build . -t flaskimage
-	
+IMAGE = swshar/art
+CONTAINER = art
+
+all: build run
+
+build: requirements.txt
+	DOCKER_BUILDKIT=1 docker build . -t $(IMAGE)
+
 run:
-	docker run --rm --name=flaskcontainer -it -p 5000:5000 flaskimage
-	
-bash:
-	docker run --rm --name=flaskcontainer -it flaskimage bash
+	./run.sh $(IMAGE) $(CONTAINER)
+
+requirements.txt: requirements.in
+	pip-compile --verbose
+
+push:
+	docker push $(IMAGE)
+

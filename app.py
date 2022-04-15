@@ -25,8 +25,13 @@ def allowed_file(filename):
 
 @APP.route('/uploads/<name>')
 def download_file(name):
-    # PAINTER.paint(name, name + '.result.jpg')
-    return send_from_directory(APP.config["UPLOAD_FOLDER"], name)
+    way_style = "modeldata/abstraktsiya.jpg"
+    way_content = APP.config["UPLOAD_FOLDER"] + '/' + name
+    alpha = 1
+    basename_result = name + '.result.jpg'
+    way_result = APP.config["UPLOAD_FOLDER"] + '/' + basename_result
+    PAINTER.paint(way_style, way_content, alpha, way_result)
+    return send_from_directory(APP.config["UPLOAD_FOLDER"], basename_result)
 
 
 @APP.route('/', methods=['GET', 'POST'])

@@ -11,6 +11,7 @@ args=(
         --rm
 	-p 5000:5000
 	-v "$PWD":/app
+	-v "$PWD"/uploads:/uploads
         --name="$container"
         "$image"
         #bash

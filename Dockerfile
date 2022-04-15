@@ -8,5 +8,7 @@ RUN pip install -r requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 COPY . .
+
+RUN mkdir /uploads
 	
 CMD ["python", "app.py", "--host=0.0.0.0"]

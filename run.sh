@@ -10,6 +10,7 @@ args=(
         -it
         --rm
 	-p 5000:5000
+	-v "$PWD":/app
         --name="$container"
         "$image"
         #bash

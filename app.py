@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import os
+import pathlib
 
 from flask import Flask, flash, redirect, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
@@ -16,6 +17,29 @@ APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 PAINTER = Painter()
 
 
+def make_html_styles():
+    html = ''
+    for i_path, path_style in enumerate(pathlib.Path('styleimages').iterdir()):
+        id_style = path_style.stem
+        html_style = f'''
+            <div>
+                <input type="radio" name="styles" 
+                       id="{id_style}" value="{id_style}"
+                       {"checked" if i_path == 0 else ""}>
+                <label for="{id_style}">
+                    <img src="styleimages/{path_style.name}" width="100">
+                </label>
+            </div>
+            '''
+        html += html_style
+    return html
+
+
+@APP.route('/styleimages/<name>')
+def styleimage(name):
+    return send_from_directory('styleimages', name)
+
+
 def allowed_file(filename):
     return (
         '.' in filename
@@ -23,9 +47,9 @@ def allowed_file(filename):
     )
 
 
-@APP.route('/uploads/<name>')
-def download_file(name):
-    way_style = "modeldata/abstraktsiya.jpg"
+@APP.route('/paint/<style>/<name>')
+def download_file(style, name):
+    way_style = f"styleimages/{style}.jpg"
     way_content = APP.config["UPLOAD_FOLDER"] + '/' + name
     alpha = 1
     basename_result = name + '.result.jpg'
@@ -42,22 +66,29 @@ def upload_file():
             flash('No file part')
             return redirect(request.url)
         file = request.files['file']
+
         # If the user does not select a file, the browser submits an
         # empty file without a filename.
         if file.filename == '':
             flash('No selected file')
             return redirect(request.url)
+
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for('download_file', name=filename))
+            return redirect(url_for(
+                'download_file', 
+                style=request.form['styles'],
+                name=filename,
+            ))
+
     return f'''
-    <!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new File</h1>
-    <p>PAINTER = {PAINTER}</p>
-    <form method=post enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form>
+        <!doctype html>
+        <title>Upload new File</title>
+        <h1>Upload new File</h1>
+        <form method=post enctype=multipart/form-data>
+            {make_html_styles()}
+            <input type=file name=file>
+            <input type=submit value=Upload>
+        </form>
     '''

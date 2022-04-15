@@ -1,7 +1,7 @@
 IMAGE = swshar/art
 CONTAINER = art
 
-all: build run
+all: run
 
 build: requirements.txt
 	DOCKER_BUILDKIT=1 docker build . -t $(IMAGE)

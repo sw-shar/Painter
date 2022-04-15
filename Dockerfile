@@ -11,4 +11,4 @@ COPY . .
 
 RUN mkdir /uploads
 	
-CMD ["python", "app.py", "--host=0.0.0.0"]
+CMD ["./flask_run.sh"]

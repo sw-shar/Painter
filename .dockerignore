@@ -1,5 +1,6 @@
 .git
 .dockerignore
+__pycache__
 Dockerfile
 Makefile
 uploads

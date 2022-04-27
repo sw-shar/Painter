@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import os
 import pathlib
+import uuid
 
 from flask import Flask, flash, redirect, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
@@ -23,7 +24,7 @@ def make_html_styles():
         id_style = path_style.stem
         html_style = f'''
             <div>
-                <input type="radio" name="styles" 
+                <input type="radio" name="style" 
                        id="{id_style}" value="{id_style}"
                        {"checked" if i_path == 0 else ""}>
                 <label for="{id_style}">
@@ -61,22 +62,21 @@ def download_file(style, name):
 def upload_file():
     if request.method == 'POST':
         # check if the post request has the file part
-        if 'file' not in request.files:
+        if 'image' not in request.files:
             flash('No file part')
             return redirect(request.url)
-        file = request.files['file']
+        file = request.files['image']
 
-        # If the user does not select a file, the browser submits an
-        # empty file without a filename.
-        if file.filename == '':
-            flash('No selected file')
-            return redirect(request.url)
-
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
+        if file:
+            filename = str(uuid.uuid4()) + '.jpg'
             file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
+
+            style = request.headers.get('X-Style')
+            if style is None:
+                style = request.form['style']
+
             return download_file(
-                style=request.form['styles'],
+                style=style,
                 name=filename,
             )
 
@@ -86,7 +86,7 @@ def upload_file():
         <h1>Upload new File</h1>
         <form method=post enctype=multipart/form-data>
             {make_html_styles()}
-            <input type=file name=file>
+            <input type=file name=image>
             <input type=submit value=Upload>
         </form>
     '''

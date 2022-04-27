@@ -47,7 +47,6 @@ def allowed_file(filename):
     )
 
 
-@APP.route('/paint/<style>/<name>')
 def download_file(style, name):
     way_style = f"styleimages/{style}.jpg"
     way_content = APP.config["UPLOAD_FOLDER"] + '/' + name
@@ -76,11 +75,10 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for(
-                'download_file', 
+            return download_file(
                 style=request.form['styles'],
                 name=filename,
-            ))
+            )
 
     return f'''
         <!doctype html>

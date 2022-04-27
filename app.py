@@ -1,4 +1,6 @@
 from argparse import ArgumentParser
+import base64
+import json
 import os
 import pathlib
 import uuid
@@ -61,24 +63,31 @@ def download_file(style, name):
 @APP.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        # check if the post request has the file part
-        if 'image' not in request.files:
-            flash('No file part')
-            return redirect(request.url)
-        file = request.files['image']
+        basename = str(uuid.uuid4()) + '.jpg'
+        filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
 
-        if file:
-            filename = str(uuid.uuid4()) + '.jpg'
-            file.save(os.path.join(APP.config['UPLOAD_FOLDER'], filename))
+        if request.content_type.startswith('application/json'):
+            data = request.get_data()
+            dic = json.loads(data.decode('utf-8'))
 
+            style = dic['style']
+
+            image_base64 = dic['image']
+            image_bytes = base64.b64decode(image_base64)
+            with open(filename, 'wb') as fileobj:  # write, binary
+                fileobj.write(image_bytes)
+        else:
             style = request.headers.get('X-Style')
             if style is None:
                 style = request.form['style']
 
-            return download_file(
-                style=style,
-                name=filename,
-            )
+            image_file = request.files['image']
+            image_file.save(filename)
+
+        return download_file(
+            style=style,
+            name=basename,
+        )
 
     return f'''
         <!doctype html>

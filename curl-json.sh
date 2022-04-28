@@ -19,7 +19,7 @@ args_curl=(
 	-X POST
        	-H 'Content-Type: application/json' 
 	--data @-
-	http://localhost:5000/
+	http://localhost:5000/forward
 )
 
 set +e  # don't exit on error

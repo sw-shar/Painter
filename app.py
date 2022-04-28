@@ -80,7 +80,7 @@ def download_file(style, name, is_json):
 
 
 
-@APP.route('/', methods=['GET', 'POST'])
+@APP.route('/forward', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
         basename = str(uuid.uuid4()) + '.jpg'

@@ -2,11 +2,18 @@
 
 set -e -o pipefail
 
-[ $# = 0 ]
+[ $# = 1 ]
+image=$1
 
-base64 | 
+key=${KEY_IMAGE:-image}
+
+base64 <"$image" | 
 	tr '\n' ' ' | 
 	perl -nle '
 		s/ /\\n/g;
-	       	print qq({"style": "abstraktsiya", "image": "$_"});
+		$text .= $_;
+
+		END {
+	       	    print qq({"style": "abstraktsiya", "'$key'": "$text"});
+	        }
 		'

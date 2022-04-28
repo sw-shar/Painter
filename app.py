@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 import base64
+import binascii
 import json
 import os
 import pathlib
@@ -13,6 +14,9 @@ from painter import Painter
 
 UPLOAD_FOLDER = '/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+ERROR_400 = ("bad request", 400)
+ERROR_503 = ("модель не смогла обработать данные", 503)
 
 APP = Flask(__name__)
 APP.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -56,7 +60,12 @@ def download_file(style, name, is_json):
     alpha = 1
     basename_result = name + '.result.jpg'
     way_result = APP.config["UPLOAD_FOLDER"] + '/' + basename_result
-    PAINTER.paint(way_style, way_content, alpha, way_result)
+
+    try:
+        PAINTER.paint(way_style, way_content, alpha, way_result)
+    except Exception:
+        return ERROR_503
+
     if not is_json:
         return send_from_directory(
                 APP.config["UPLOAD_FOLDER"], basename_result)
@@ -80,20 +89,37 @@ def upload_file():
 
         if is_json:
             data = request.get_data()
-            dic = json.loads(data.decode('utf-8'))
+            try:
+                dic = json.loads(data.decode('utf-8'))
+            except (UnicodeDecodeError, json.decoder.JSONDecodeError):
+                return ERROR_400
 
-            style = dic['style']
+            try:
+                style = dic['style']
+                image_base64 = dic['image']
+            except KeyError:
+                return ERROR_400
 
-            image_base64 = dic['image']
-            image_bytes = base64.b64decode(image_base64)
+            try:
+                image_bytes = base64.b64decode(image_base64)
+            except binascii.Error:
+                return ERROR_400
+
             with open(filename, 'wb') as fileobj:  # write, binary
                 fileobj.write(image_bytes)
         else:
             style = request.headers.get('X-Style')
             if style is None:
-                style = request.form['style']
+                try:
+                    style = request.form['style']
+                except KeyError:
+                    return ERROR_400
 
-            image_file = request.files['image']
+            try:
+                image_file = request.files['image']
+            except KeyError:
+                return ERROR_400
+
             image_file.save(filename)
 
         return download_file(

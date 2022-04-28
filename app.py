@@ -50,14 +50,25 @@ def allowed_file(filename):
     )
 
 
-def download_file(style, name):
+def download_file(style, name, is_json):
     way_style = f"styleimages/{style}.jpg"
     way_content = APP.config["UPLOAD_FOLDER"] + '/' + name
     alpha = 1
     basename_result = name + '.result.jpg'
     way_result = APP.config["UPLOAD_FOLDER"] + '/' + basename_result
     PAINTER.paint(way_style, way_content, alpha, way_result)
-    return send_from_directory(APP.config["UPLOAD_FOLDER"], basename_result)
+    if not is_json:
+        return send_from_directory(
+                APP.config["UPLOAD_FOLDER"], basename_result)
+
+    with open(way_result, 'rb') as fileobj:
+        image_bytes = fileobj.read()
+
+    image_base64_bytes = base64.b64encode(image_bytes)
+    image_base64_str = image_base64_bytes.decode()
+    dic = {'image': image_base64_str}
+    return dic
+
 
 
 @APP.route('/', methods=['GET', 'POST'])
@@ -65,8 +76,9 @@ def upload_file():
     if request.method == 'POST':
         basename = str(uuid.uuid4()) + '.jpg'
         filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
+        is_json = request.content_type.startswith('application/json')
 
-        if request.content_type.startswith('application/json'):
+        if is_json:
             data = request.get_data()
             dic = json.loads(data.decode('utf-8'))
 
@@ -87,6 +99,7 @@ def upload_file():
         return download_file(
             style=style,
             name=basename,
+            is_json=is_json,
         )
 
     return f'''

@@ -2,12 +2,18 @@
 
 set -e -o pipefail
 
-[ $# = 0 ]
+[ $# = 1 ]
+image=$1
 
-args=(
+args_curl=(
 	-X POST
        	-H 'Content-Type: application/json' 
 	--data @-
 	http://localhost:5000/
 )
-curl "${args[@]}" | display -
+
+./image2json.sh <"$image" |
+	curl "${args_curl[@]}" |
+       	jq -r '.image' |
+	base64 -d - | 
+	display -

@@ -1,6 +1,9 @@
 import os
 import sys
+import time
 
+import onnx
+from onnx2pytorch import ConvertModel
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,6 +13,16 @@ import torchvision.transforms as transforms
 from PIL import Image
 from skimage import img_as_float, io
 from torchvision.utils import save_image
+
+
+IS_SAVING_ONNX = False
+FILENAME_PTH = "modeldata/vgg_normalised.pth"
+FILENAME_ONNX = "modeldata/model.onnx"
+
+
+def filename2mtime(filename):
+    mtime = os.path.getmtime(filename)
+    return time.ctime(mtime)
 
 
 class Decoder(nn.Module):
@@ -203,7 +216,7 @@ class StyleTransferNetwork(nn.Module):
         learning_rate=1e-4,
         learning_rate_decay=5e-5,  # Параметр затухания для скорости обучения
         gamma=6,  # Управляет важностью StyleLoss и ContentLoss, Loss = gamma*StyleLoss + ContentLoss
-        train=True,  # Обучается сеть или нет
+        training=True,  # Обучается сеть или нет
         load_fromstate=False,  # Загрузить с контрольной точки?
         load_path=None,  # Путь для загрузки контрольной точки
     ):
@@ -215,7 +228,7 @@ class StyleTransferNetwork(nn.Module):
 
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
-        self.train = train
+        self.training = training
         self.gamma = gamma
 
         self.encoder = Encoder(
@@ -236,7 +249,7 @@ class StyleTransferNetwork(nn.Module):
 
     def set_train(self, boolean):  # Изменить состояние сети
         assert type(boolean) == bool
-        self.train = boolean
+        self.training = boolean
 
     def adjust_learning_rate(
         self, optimiser, iters
@@ -251,14 +264,14 @@ class StyleTransferNetwork(nn.Module):
 
         # Encode style and content
         layers_style = self.encoder(
-            style, self.train
-        )  # if train: возвращает все состояния
+            style, self.training
+        )  # if training: возвращает все состояния
         layer_content = self.encoder(
             content, False
         )  # для контента важен только последний слой
 
         # Transfer Style
-        if self.train:
+        if self.training:
             style_applied = AdaIn(
                 layer_content, layers_style[-1]
             )  # Последний слой - это слой «стиль».
@@ -270,11 +283,11 @@ class StyleTransferNetwork(nn.Module):
 
         # Scale up
         style_applied_upscaled = self.decoder(style_applied)
-        if not self.train:
+        if not self.training:
             return style_applied_upscaled  # Когда не тренируется, возвращайте преобразованное изображение
 
         # Вычислить потери
-        layers_style_applied = self.encoder(style_applied_upscaled, self.train)
+        layers_style_applied = self.encoder(style_applied_upscaled, self.training)
 
         content_loss = Content_loss(layers_style_applied[-1], layer_content)
         style_loss = Style_loss(layers_style_applied, layers_style)
@@ -344,8 +357,9 @@ def is_jupyter():
 
 class Painter:
     def __init__(self):
+        #state_vgg = ConvertModel(onnx.load('model.onnx'))
         state_vgg = torch.load(
-            "modeldata/vgg_normalised.pth", map_location=torch.device("cpu")
+            FILENAME_PTH, map_location=torch.device("cpu")
         )
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -353,7 +367,7 @@ class Painter:
         self.network = StyleTransferNetwork(
             self.device,
             state_vgg,
-            train=False,
+            training=False,
             load_fromstate=True,
             load_path="modeldata/StyleTransfer Checkpoint Iter_ 120000.tar",
         )
@@ -367,6 +381,23 @@ class Painter:
         )
 
         self.toPIL = transforms.ToPILImage(mode="RGB")
+
+        self.model_onnx = onnx.load(FILENAME_ONNX)
+
+    def save_to_onnx(self, style, content, alpha):
+        self.network.train(False)
+        torch.onnx.export(self.network, (style, content, alpha), 
+                          FILENAME_ONNX)
+        model = onnx.load(FILENAME_ONNX)
+        meta = model.metadata_props.add()
+        meta.key = 'mtime'
+        meta.value = filename2mtime(FILENAME_PTH)
+        onnx.save(model, FILENAME_ONNX)
+
+    def get_metadata(self):
+        key2value = {prop.key: prop.value 
+                     for prop in self.model_onnx.metadata_props}
+        return {'mtime': key2value['mtime']}
 
     def paint(self, way_style, way_content, alpha, way_result=None):
         if way_result is None:
@@ -386,6 +417,9 @@ class Painter:
 
         style_img = img_as_float(io.imread(way_style))
         content_img = img_as_float(io.imread(way_content))
+
+        if IS_SAVING_ONNX:
+            self.save_to_onnx(style, content, alpha)
 
         out = self.network(style, content, alpha).cpu()
         # convert to grid/image
@@ -414,11 +448,12 @@ class Painter:
 
 def main():
     painter = Painter()
-    way_style = 'media/abstraktsiya.jpg'
-    way_content = "media/moskva.jpg"
+    way_style = 'styleimages/abstraktsiya.jpg'
+    way_content = "tmp/moskva.jpg"
     alpha = 1
 
     painter.paint(way_style, way_content, alpha)
+    print(painter.get_metadata())
 
 
 if __name__ == '__main__':

@@ -138,3 +138,8 @@ def upload_file():
             <input type=submit value=Upload>
         </form>
     '''
+
+
+@APP.route('/metadata')
+def get_metadata():
+    return PAINTER.get_metadata()

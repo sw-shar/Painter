@@ -1,4 +1,5 @@
 flask
+onnx
 scikit-image
 torch
 torchvision

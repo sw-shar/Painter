@@ -48,12 +48,13 @@ def styleimage(name):
     return send_from_directory('styleimages', name)
 
 
-def download_file(style, path_content, *, is_json=True, are_metrics=False):
+def download_file(style, path_content, *, is_json=True, are_metrics=False,
+                  jobid):
     path_style = f'styleimages/{style}.jpg'
     alpha = 1
 
-    path_result = path_content + '.result.jpg'  
-    # todo: another dir to avoid clashes
+    path_result = f'{path_content}.result-{jobid}.jpg'  
+    # Note: `jobid` is to avoid name clashes.
 
     try:
         metrics = PAINTER.paint(path_style, path_content, alpha, path_result)
@@ -78,7 +79,8 @@ def download_file(style, path_content, *, is_json=True, are_metrics=False):
 @APP.route('/forward', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        basename = str(uuid.uuid4()) + '.jpg'
+        jobid = str(uuid.uuid4())
+        basename = jobid + '.jpg'
         filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
         is_json = request.content_type.startswith('application/json')
 
@@ -121,6 +123,7 @@ def upload_file():
             style=style,
             path_content=APP.config["UPLOAD_FOLDER"] + '/' + basename,
             is_json=is_json,
+            jobid=jobid,
         )
 
     return f'''
@@ -140,8 +143,9 @@ def get_metadata():
     return PAINTER.get_metadata()
 
 
-def evaluate_files(style, fileid2filename, are_metrics):
-    return {fileid: download_file(style, filename, are_metrics=are_metrics)
+def evaluate_files(*, style, fileid2filename, are_metrics, jobid):
+    return {fileid: download_file(style, filename, are_metrics=are_metrics,
+                                  jobid=jobid)
             for fileid, filename in fileid2filename.items()}
 
 
@@ -156,10 +160,10 @@ def evaluate():
 
 
 def evaluate_core(are_metrics=True):
-    uuid4 = str(uuid.uuid4())
-    basename = uuid4 + '.zip'
+    jobid = str(uuid.uuid4())
+    basename = jobid + '.zip'
     filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
-    path_dir = os.path.join(APP.config['UPLOAD_FOLDER'], uuid4)
+    path_dir = os.path.join(APP.config['UPLOAD_FOLDER'], jobid)
     os.mkdir(path_dir)
 
     try:
@@ -186,4 +190,5 @@ def evaluate_core(are_metrics=True):
         style=style,
         fileid2filename=fileid2filename,
         are_metrics=are_metrics,
+        jobid=jobid,
     )

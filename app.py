@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 import base64
 import binascii
 import json
@@ -7,8 +6,7 @@ import pathlib
 import uuid
 import zipfile
 
-from flask import Flask, flash, redirect, request, send_from_directory, url_for
-from werkzeug.utils import secure_filename
+from flask import Flask, request, send_from_directory, send_file
 
 from painter import Painter
 
@@ -31,7 +29,7 @@ def make_html_styles():
         id_style = path_style.stem
         html_style = f'''
             <div>
-                <input type="radio" name="style" 
+                <input type="radio" name="style"
                        id="{id_style}" value="{id_style}"
                        {"checked" if i_path == 0 else ""}>
                 <label for="{id_style}">
@@ -53,7 +51,7 @@ def download_file(style, path_content, *, is_json=True, are_metrics=False,
     path_style = f'styleimages/{style}.jpg'
     alpha = 1
 
-    path_result = f'{path_content}.result-{jobid}.jpg'  
+    path_result = f'{path_content}.result-{jobid}.jpg'
     # Note: `jobid` is to avoid name clashes.
 
     try:
@@ -62,8 +60,7 @@ def download_file(style, path_content, *, is_json=True, are_metrics=False,
         return ERROR_503
 
     if not is_json:
-        return send_from_directory(
-                APP.config["UPLOAD_FOLDER"], basename_result)
+        return send_file(path_result)
 
     with open(path_result, 'rb') as fileobj:
         image_bytes = fileobj.read()

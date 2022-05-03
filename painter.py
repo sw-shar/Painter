@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import time
 
 import onnx
-#from onnx2pytorch import ConvertModel
+# from onnx2pytorch import ConvertModel
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,7 +13,6 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 from skimage import img_as_float, io
-from torchvision.utils import save_image
 
 
 IS_SAVING_ONNX = False
@@ -217,7 +215,11 @@ class StyleTransferNetwork(nn.Module):
         enc_state_dict,  # Состояние предварительно обученного vgg19
         learning_rate=1e-4,
         learning_rate_decay=5e-5,  # Параметр затухания для скорости обучения
-        gamma=6,  # Управляет важностью StyleLoss и ContentLoss, Loss = gamma*StyleLoss + ContentLoss
+
+        gamma=6,
+        # Управляет важностью StyleLoss и ContentLoss,
+        # Loss = gamma*StyleLoss + ContentLoss
+
         training=True,  # Обучается сеть или нет
         load_fromstate=False,  # Загрузить с контрольной точки?
         load_path=None,  # Путь для загрузки контрольной точки
@@ -235,7 +237,9 @@ class StyleTransferNetwork(nn.Module):
 
         self.encoder = Encoder(
             enc_state_dict, device
-        )  # В качестве кодировщика используется предварительно обученный vgg19.
+        )
+        # В качестве кодировщика используется предварительно обученный vgg19.
+
         self.decoder = Decoder().to(device)
 
         self.optimiser = optim.Adam(
@@ -253,16 +257,11 @@ class StyleTransferNetwork(nn.Module):
         assert type(boolean) == bool
         self.training = boolean
 
-    def adjust_learning_rate(
-        self, optimiser, iters
-    ):  # Простое снижение скорости обучения
-        lr = learning_rate / (1.0 + learning_rate_decay * iters)
-        for param_group in optimiser.param_groups:
-            param_group['lr'] = lr
-
     def forward(
         self, style, content, alpha=1.0
-    ):  # Альфа может использоваться во время тестирования для контроля важности переданного стиля.
+    ):
+        # Альфа может использоваться во время тестирования
+        # для контроля важности переданного стиля.
 
         # Encode style and content
         layers_style = self.encoder(
@@ -287,7 +286,8 @@ class StyleTransferNetwork(nn.Module):
         style_applied_upscaled = self.decoder(style_applied)
 
         # Вычислить потери
-        layers_style_applied = self.encoder(style_applied_upscaled, self.training)
+        layers_style_applied = self.encoder(style_applied_upscaled,
+                                            self.training)
 
         content_loss = Content_loss(layers_style_applied[-1], layer_content)
         style_loss = Style_loss(layers_style_applied, layers_style)
@@ -303,9 +303,8 @@ class StyleTransferNetwork(nn.Module):
         return style_applied_upscaled, metrics
 
 
-
-# Декодер представляет собой перевернутый vgg19 до ReLU 4.1. Обратите внимание, что последний слой не активирован.
-
+# Декодер представляет собой перевернутый vgg19 до ReLU 4.1.
+# Обратите внимание, что последний слой не активирован.
 
 # Вычисляет среднее и стандартное значение по каналам
 def calc_mean_std(input, eps=1e-5):
@@ -323,9 +322,11 @@ def calc_mean_std(input, eps=1e-5):
 
 
 def AdaIn(content, style):
+    # Только первые два затемнения, так что возможны разные размеры изображения
     assert (
         content.shape[:2] == style.shape[:2]
-    )  # Только первые два затемнения, так что возможны разные размеры изображения
+    )
+
     batch_size, n_channels = content.shape[:2]
     mean_content, std_content = calc_mean_std(content)
     mean_style, std_style = calc_mean_std(style)
@@ -357,14 +358,14 @@ def Style_loss(input, target):
 def is_jupyter():
     try:
         __file__
-    except:
+    except NameError:
         return True
     return False
 
 
 class Painter:
     def __init__(self):
-        #state_vgg = ConvertModel(onnx.load('model.onnx'))
+        # state_vgg = ConvertModel(onnx.load('model.onnx'))
         state_vgg = torch.load(
             FILENAME_PTH, map_location=torch.device("cpu")
         )
@@ -393,7 +394,7 @@ class Painter:
 
     def save_to_onnx(self, style, content, alpha):
         self.network.train(False)
-        torch.onnx.export(self.network, (style, content, alpha), 
+        torch.onnx.export(self.network, (style, content, alpha),
                           FILENAME_ONNX)
         model = onnx.load(FILENAME_ONNX)
         meta = model.metadata_props.add()
@@ -402,7 +403,7 @@ class Painter:
         onnx.save(model, FILENAME_ONNX)
 
     def get_metadata(self):
-        key2value = {prop.key: prop.value 
+        key2value = {prop.key: prop.value
                      for prop in self.model_onnx.metadata_props}
         return {'mtime': key2value['mtime']}
 
@@ -410,7 +411,8 @@ class Painter:
         if way_result is None:
             way_result = way_content + '.result.jpg'
 
-        # Загрузить изображение, преобразовать в RGB, преобразовать, добавить размер 0 и переместить на устройство
+        # Загрузить изображение, преобразовать в RGB, преобразовать,
+        # добавить размер 0 и переместить на устройство
         style = (
             self.transform(Image.open(way_style).convert("RGB"))
             .unsqueeze(0)
@@ -461,7 +463,7 @@ def main():
     alpha = 1
 
     print(painter.paint(way_style, way_content, alpha))
-    #print(painter.get_metadata())
+    # print(painter.get_metadata())
 
 
 if __name__ == '__main__':

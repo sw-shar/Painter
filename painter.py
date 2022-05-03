@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import time
 
 import onnx
-from onnx2pytorch import ConvertModel
+#from onnx2pytorch import ConvertModel
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -283,8 +285,6 @@ class StyleTransferNetwork(nn.Module):
 
         # Scale up
         style_applied_upscaled = self.decoder(style_applied)
-        if not self.training:
-            return style_applied_upscaled  # Когда не тренируется, возвращайте преобразованное изображение
 
         # Вычислить потери
         layers_style_applied = self.encoder(style_applied_upscaled, self.training)
@@ -294,7 +294,14 @@ class StyleTransferNetwork(nn.Module):
 
         loss_comb = content_loss + self.gamma * style_loss
 
-        return loss_comb, content_loss, style_loss
+        metrics = {
+                'content_loss': float(content_loss),
+                'style_loss': float(style_loss),
+                'loss_comb': float(loss_comb),
+        }
+
+        return style_applied_upscaled, metrics
+
 
 
 # Декодер представляет собой перевернутый vgg19 до ReLU 4.1. Обратите внимание, что последний слой не активирован.
@@ -421,7 +428,8 @@ class Painter:
         if IS_SAVING_ONNX:
             self.save_to_onnx(style, content, alpha)
 
-        out = self.network(style, content, alpha).cpu()
+        out, metrics = self.network(style, content, alpha)
+        out = out.cpu()
         # convert to grid/image
         out = torchvision.utils.make_grid(
             out.clamp(min=-1, max=1), nrow=3, scale_each=True, normalize=True
@@ -432,7 +440,7 @@ class Painter:
         if not is_jupyter():
             img.save(way_result)
             print('ok')
-            return
+            return metrics
 
         images = [style_img, content_img, img]
         titles = ['Style', 'Content', 'Adaptive']
@@ -452,8 +460,8 @@ def main():
     way_content = "tmp/moskva.jpg"
     alpha = 1
 
-    painter.paint(way_style, way_content, alpha)
-    print(painter.get_metadata())
+    print(painter.paint(way_style, way_content, alpha))
+    #print(painter.get_metadata())
 
 
 if __name__ == '__main__':

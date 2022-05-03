@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import uuid
+import zipfile
 
 from flask import Flask, flash, redirect, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
@@ -47,22 +48,15 @@ def styleimage(name):
     return send_from_directory('styleimages', name)
 
 
-def allowed_file(filename):
-    return (
-        '.' in filename
-        and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-    )
-
-
-def download_file(style, name, is_json):
-    way_style = f"styleimages/{style}.jpg"
-    way_content = APP.config["UPLOAD_FOLDER"] + '/' + name
+def download_file(style, path_content, *, is_json=True, are_metrics=False):
+    path_style = f'styleimages/{style}.jpg'
     alpha = 1
-    basename_result = name + '.result.jpg'
-    way_result = APP.config["UPLOAD_FOLDER"] + '/' + basename_result
+
+    path_result = path_content + '.result.jpg'  
+    # todo: another dir to avoid clashes
 
     try:
-        PAINTER.paint(way_style, way_content, alpha, way_result)
+        metrics = PAINTER.paint(path_style, path_content, alpha, path_result)
     except Exception:
         return ERROR_503
 
@@ -70,14 +64,15 @@ def download_file(style, name, is_json):
         return send_from_directory(
                 APP.config["UPLOAD_FOLDER"], basename_result)
 
-    with open(way_result, 'rb') as fileobj:
+    with open(path_result, 'rb') as fileobj:
         image_bytes = fileobj.read()
 
     image_base64_bytes = base64.b64encode(image_bytes)
     image_base64_str = image_base64_bytes.decode()
     dic = {'image': image_base64_str}
+    if are_metrics:
+        dic['metrics'] = metrics
     return dic
-
 
 
 @APP.route('/forward', methods=['GET', 'POST'])
@@ -124,7 +119,7 @@ def upload_file():
 
         return download_file(
             style=style,
-            name=basename,
+            path_content=APP.config["UPLOAD_FOLDER"] + '/' + basename,
             is_json=is_json,
         )
 
@@ -143,3 +138,52 @@ def upload_file():
 @APP.route('/metadata')
 def get_metadata():
     return PAINTER.get_metadata()
+
+
+def evaluate_files(style, fileid2filename, are_metrics):
+    return {fileid: download_file(style, filename, are_metrics=are_metrics)
+            for fileid, filename in fileid2filename.items()}
+
+
+@APP.route('/forward_batch', methods=['POST'])
+def forward_batch():
+    return evaluate_core(are_metrics=False)
+
+
+@APP.route('/evaluate', methods=['POST'])
+def evaluate():
+    return evaluate_core()
+
+
+def evaluate_core(are_metrics=True):
+    uuid4 = str(uuid.uuid4())
+    basename = uuid4 + '.zip'
+    filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
+    path_dir = os.path.join(APP.config['UPLOAD_FOLDER'], uuid4)
+    os.mkdir(path_dir)
+
+    try:
+        style = request.headers['X-Style']
+    except KeyError:
+        return ERROR_400
+
+    try:
+        zip_file = request.files['zip_in']
+    except KeyError:
+        return ERROR_400
+
+    zip_file.save(filename)
+
+    with zipfile.ZipFile(filename, 'r') as file_zip:
+        file_zip.extractall(path_dir)
+
+    len_prefix = len(path_dir) + 1
+    fileid2filename = {str(path)[len_prefix:]: str(path)
+                       for path in pathlib.Path(path_dir).glob('**/*')
+                       if not path.is_dir()}
+
+    return evaluate_files(
+        style=style,
+        fileid2filename=fileid2filename,
+        are_metrics=are_metrics,
+    )

@@ -15,3 +15,5 @@ requirements.txt: requirements.in
 push:
 	docker push $(IMAGE)
 
+test:
+	./test.sh

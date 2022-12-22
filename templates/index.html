@@ -1,0 +1,88 @@
+<!doctype html>
+        <title>Запрос к базе данных</title>
+        <h1>Ввод</h1>
+<p>введите свой запрос:</p> 
+        <form method=post>
+	    <input type=text name=query size=30 value={{ query }}>
+            <input type=submit value=Upload>
+        </form>
+
+	{% if error %}
+       <p>Error: {{error}}</p>
+	{% endif %}
+
+	{% if name %}
+	<p>{{name}}: <b>{{ price }}</b></p>
+	<p><img src="{{image_url}}"></p>
+	{% endif %}
+
+	<hr>
+
+       <h2>Этот проект создан в рамках диплома магистерской программы ВШЭ</h2>
+<h4>Машинное обучение и высоконагруженные системы. 2022 год</h4>
+  
+<h3>Combinations of CNN  and Transformers in the multi class classification</h3>
+
+ <p>Работа представляет собой сайт - в котором поcетители могут ввести свой запрос
+и система распознает введенные сущности и формирует ответ на основании базы
+данных</p> 
+  <br> 
+  <br> 
+   <p><b>Вид запроса:</b></p>
+   <p><i>doosan dx160w бортовой редуктор</p>
+    <p>гидравлический насос на doosan 225 цена</p>
+    <p>насос экскаватора hyundai r210lc</i></p>
+  
+ 
+  <p><b>Вид базы данных</b></p>
+<table>
+    <tbody>
+    <tr>
+        <td>marka</td>
+        <td>model</td>
+
+      <td>number</td>
+      <td>price</td>
+              <td>group0</td>
+      <td>group1</td>
+      <td>group2</td>
+    </tr>
+    <tr>
+        <td>Doosan</td>
+        <td>dx225</td>
+
+      <td>400914-00212</td>
+      <td>160000</td>
+              <td>насос</td>
+        <td>гидравлический</td>
+      <td>основной</td>
+    </tr>
+          <tr>
+        <td>Hyundai</td>
+        <td>r160lc-7</td>
+
+      <td>31n5-40010</td>
+      <td>210000</td>
+                    <td>редуктор</td>
+        <td>хода</td>
+      <td>в сборе</td>
+    </tr>
+     <tr>
+        <td>Hyundai</td>
+        <td>r160lc-7</td>
+
+      <td>31n5-10011</td>
+      <td>150000</td>
+                    <td>насос</td>
+        <td>гидравлический</td>
+      <td>основной</td>
+    </tr>
+    </tbody>
+</table>
+   <p><b>Технологии использованные в проекте:</b></p> 
+  <p>Сверточная нейронная сеть (Convolutional Neural Networks)</p>
+   <p>Transformers</p>
+  <p>SQLite</p>
+  <p>Flask</p>
+   <p>Регулярные выражения(regexp)</p>
+ <p> Docker </p>  

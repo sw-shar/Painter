@@ -17,3 +17,6 @@ push:
 
 test:
 	./test.sh
+
+exec:
+	docker exec -it $(CONTAINER) bash

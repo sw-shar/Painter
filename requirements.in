@@ -1,6 +1,7 @@
 flake8
 flask
 gensim
+jinja2
 matplotlib
 numpy
 onnx

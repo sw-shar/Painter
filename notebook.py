@@ -268,7 +268,8 @@ matrix_data =matrix_hyundai+matrix_doosan+matrix_volvo
 all_frame_model = pd.DataFrame(matrix_data, columns=['marka_','model','marka','model_normal']).dropna()
 #непомню зачем я получаю цифры из всего
 all_frame_model['cifra'] = all_frame_model['model_normal'].apply(lambda x: ''.join(cifra(x)))
-all_frame_model.to_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv')
+if __name__ == '__main__':
+  all_frame_model.to_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv')
 
 print('Всего моделей - ',len(all_frame_model.model_normal.value_counts()),'Всего марок - ',len(all_frame_model.marka.value_counts()))
 all_frame_model.head(5)
@@ -460,10 +461,10 @@ spare_parts_example_test = [
 """### Для базы данных"""
 
 # еще данных
-parts_mainpump = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/parts_mainpump.csv' ,index_col=False)
+parts_mainpump = pd.read_csv(fixpath('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/parts_mainpump.csv') ,index_col=False)
 parts_mainpump[8:10]
 
-baza_name_marke_model = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv' ,index_col=False).drop('Unnamed: 0', axis =1)
+baza_name_marke_model = pd.read_csv(fixpath('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv') ,index_col=False).drop('Unnamed: 0', axis =1)
 
 # заберем только то что есть выборках
 sp_model =list(set([row[2] for row in spare_parts_example]+ \
@@ -613,8 +614,6 @@ def prepare_df_func(number,
 
   return class_names, df
 
-baza_name_marke_model
-
 def tare_me_oll_parts(spare_parts_name, baza_name_marke_model,number, longer = False):
   '''
   Функция которая готовит нашу базу для обучения
@@ -657,9 +656,6 @@ def tare_me_oll_parts(spare_parts_name, baza_name_marke_model,number, longer = F
   df['marka_model'] = df['marka'] +'/'+ df['model']
   return df
 #df.to_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/name_marka_model_400000.csv')
-
-baza_name_marke_model = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv' ,index_col=False).drop('Unnamed: 0', axis =1)
-#tare_me_oll_parts(spare_parts_name, baza_name_marke_model)
 
 def filtr_baza(df,  counts =25):
   '''
@@ -854,7 +850,8 @@ def cifra(text):
   russian =re.findall(r,text)
   return russian
 
-print('Все загрузилось')
+baza_name_marke_model = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/all_frame_model.csv' ,index_col=False).drop('Unnamed: 0', axis =1)
+#tare_me_oll_parts(spare_parts_name, baza_name_marke_model)
 
 """# Word2Vec
 
@@ -1043,7 +1040,12 @@ image_graph(history)
 
 #torch.save(model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_emmbed')
 
-model = torch.load('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_emmbed')
+def fixpath(path):
+  if __name__ == '__main__':
+    return path
+  return path.replace('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/', 'data/')
+  
+model = torch.load(fixpath('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_emmbed'))
 
 model.eval()
 #model.predict(make_batch(test_sentences[:10], test_targets[:10], max_len=10))
@@ -1103,7 +1105,7 @@ eee
 
 """# BERT"""
 
-!pip install -qq transformers
+#!pip install -qq transformers
 
 from transformers import BertModel,BertPreTrainedModel
 import torch.nn as nn
@@ -1122,7 +1124,7 @@ class bertmodel(BertPreTrainedModel):
         # cls = torch.mul(qk_attention_mask.unsqueeze(-1),output[0])
         cls = self.dropout(output[0])
         return cls
-
+        
 class model_xq_model(nn.Module):
     def __init__(self,bertmodel):
         super(model, self).__init__()
@@ -1173,100 +1175,12 @@ def getparse():
 
     return parse
 
+'''
 bert_model = bertmodel.from_pretrained('bert-base-cased')
 #bert_model = bertmodel.from_pretrained('bert-base-cased').to(device)
 #args = getparse().parse_args()
 xq_model = model_xq_model(bert_model).to(device)
-
-m_f = 0
-K = 2
-#训练模型
-def train_fun(m_f):
-    train_loss = 0
-    pbar = tqdm(train_loader)
-    xq_model.train()
-    for step,batch in enumerate(pbar):
-        qk_input_ids = batch['qk_input_ids'].long().to(device)
-        qk_attention_mask = batch['qk_attention_mask'].to(device)
-        label = batch['label'].to(device)
-
-        pred = xq_model(qk_input_ids,qk_attention_mask)
-        # print(torch.argmax(pred,dim=-1))
-
-
-        loss = loss_fun(pred,label)
-
-        train_loss +=loss.item()
-
-        loss.backward()
-        pgd.backup_grad()
-        for t in range(K):
-            pgd.attack(is_first_attack=(t==0)) # 在embedding上添加对抗扰动, first attack时备份param.data
-            if t != K-1:
-                xq_model.zero_grad()
-            else:
-                pgd.restore_grad()
-            pred_adv = xq_model(qk_input_ids,qk_attention_mask)
-            loss_adv = loss_fun(pred_adv,label)
-            loss_adv.backward()
-        pgd.restore()
-        optim.step()
-        optim.zero_grad()
-        pbar.update()
-        pbar.set_description(f'train_loss:{train_loss}')
-
-        if step % 1000==0 and step != 0:
-            xq_model.eval()
-            num_corr_1 = 0
-            num_corr_2 = 0
-            num_corr_3 = 0
-            predg1,predg2,predg3 = 0,0,0
-            goldg1,goldg2,goldg3 = 0,0,0
-            with torch.no_grad():
-                for batch in dev_loader:
-                    qk_input_ids = batch['qk_input_ids'].long().to(device)
-                    qk_attention_mask = batch['qk_attention_mask'].to(device)
-
-                    label = batch['label'].to(device)
-                    goldg1 += torch.sum(label==0).cpu()
-                    goldg2 += torch.sum(label==1).cpu()
-                    goldg3 += torch.sum(label==2).cpu()
-
-                    pred = xq_model(qk_input_ids,qk_attention_mask)
-                    predg1 += torch.sum(torch.argmax(pred,dim=-1)==0).cpu().numpy()
-                    predg2 += torch.sum(torch.argmax(pred,dim=-1)==1).cpu().numpy()
-                    predg3 += torch.sum(torch.argmax(pred,dim=-1)==2).cpu().numpy()
-
-                    num_corr_1 += len(np.intersect1d((torch.argmax(pred, dim=-1) == 0).nonzero().squeeze(-1).cpu().numpy(),
-                                                     (label == 0).nonzero().squeeze(-1).cpu().numpy()))
-                    num_corr_2 += len(np.intersect1d((torch.argmax(pred, dim=-1) == 1).nonzero().squeeze(-1).cpu().numpy(),
-                                                     (label == 1).nonzero().squeeze(-1).cpu().numpy()))
-                    num_corr_3 += len(np.intersect1d((torch.argmax(pred, dim=-1) == 2).nonzero().squeeze(-1).cpu().numpy(),
-                                                     (label == 2).nonzero().squeeze(-1).cpu().numpy()))
-
-
-
-            f1 = evalfun(num_corr_1, predg1, goldg1)
-            f2 = evalfun(num_corr_2, predg2, goldg2)
-            f3 = evalfun(num_corr_3, predg3, goldg3)
-
-            f = (f1+f2+f3)/3
-            print('f1:',f)
-            if m_f < f:
-                m_f = f
-                print('model save')
-                torch.save(xq_model,'xq_model.bin')
-            xq_model.train()
-    return m_f
-
-for epoch in range(30):
-    m_f = train_fun(m_f)
-
-print(m_f)
-
-pgd = PGD(xq_model,emb_name='word_embeddings.',epsilon=0.8,alpha=0.2)
-optim = AdamW(xq_model.parameters(),lr=args.lr)
-loss_fun = torch.nn.CrossEntropyLoss()
+'''
 
 """## 2"""
 
@@ -1574,6 +1488,7 @@ from transformers import logging
 logging.set_verbosity_warning()#BertForSequenceClassification
 
 # Commented out IPython magic to ensure Python compatibility.
+# '''
 # %%time
 # df_target = 'marka_model'
 # EPOCHS = 100
@@ -1588,19 +1503,23 @@ logging.set_verbosity_warning()#BertForSequenceClassification
 # 
 # torch.save(model_marka_model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_marka_model')
 # #model_marka = torch.load('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_marka_model')
-#
+# '''
 
+'''
 # график обучения
 image_graph(history)
 
 torch.save(model_marka_model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_marka_model_400_only_name')
+'''
 
+'''
 import torch.nn.functional as F
 
 y_review_texts, y_pred, y_pred_probs, y_test = get_predictions(
   model_marka_model, test_data_loader)
 
 confusion_matrix_print(df, df_target,y_test, y_pred)
+
 
 review_text = "210lc-7 гидронасос"
 
@@ -1623,19 +1542,19 @@ _, prediction = torch.max(output, dim=1)
 
 print(f'Review text: {review_text}')
 print(f'Sentiment  : {ix2word[prediction.item()]}')
+'''
 
+'''
 new_dict_name = {value: key for key, value in enumerate(df[df_target].unique())}
 cm = confusion_matrix(y_test, y_pred, labels=list(new_dict_name.values()))
 df_cm = pd.DataFrame(cm, index=new_dict_name, columns=new_dict_name)
 
 df_cm.to_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/df_matrix_model_400000.csv')
-
-"""#### а как насчет выборки метркии """
-
-oll
+'''
 
 """### name"""
 
+'''
 df = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/df_for_train_bert.csv')
 df[:3]
 
@@ -1653,16 +1572,18 @@ model_name, history, test_data_loader = model_trein(df, model_name ,df_target,EP
 
 torch.save(model_name, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_name')
 #model_name = torch.load('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_name')
+'''
 
+'''
 # график обучения
 image_graph(history)
-
 import torch.nn.functional as F
 
 y_review_texts, y_pred, y_pred_probs, y_test = get_predictions(
   model, test_data_loader)
 
 confusion_matrix_print(df, df_target)
+'''
 
 """!!! посмотреть как берт обучаеться на запросах без марки
 
@@ -1673,13 +1594,13 @@ import re
 import numpy as np
 import pandas as pd
 
+'''
 df = pd.read_csv('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/name_marka_model.csv')
-len(df)
-
 df.columns=['name','marka','model']
+len(df)
+'''
 
-df[:3]
-
+''''
 df_target = 'model'
 EPOCHS = 20
 BATCH_SIZE = 16
@@ -1694,43 +1615,44 @@ model_model, history, test_data_loader = model_trein(df, model_model ,df_target,
 
 torch.save(model_model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_model')
 #model_model = torch.load('/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_model')
+'''
 
-torch.save(model_model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_model')
+#torch.save(model_model, '/content/drive/MyDrive/учеба/ВЫШКА/ДИПЛОМ/Example/model_model')
 
 # график обучения 40 эпох батч 32 + 15 батч 64 + 20 батч 16
-image_graph(history)
+#image_graph(history)
 
 # график обучения # 20 этох батч 64 + 40 эпох батч 128
-image_graph(history)
+#image_graph(history)
 
+'''
 import torch.nn.functional as F
 
 y_review_texts, y_pred, y_pred_probs, y_test = get_predictions(
   model_model, test_data_loader)
 
 confusion_matrix_print(df, df_target)
+'''
 
-"""## общий номер"""
+"""## общий номер
 
-kom
+#Работа
+"""
 
-"""#Работа"""
-
+'''
 #создаем рандомные пользовательский запрос - из наших данных - меняем написание запчасти, марки, модели
 parts_mainpump_prerare = prerare_exel(parts_mainpump)
 
 train = zapros_example(spare_parts_example) + zapros_example(parts_mainpump_prerare)
 test= zapros_example(spare_parts_example_test)
-
 len(train), len(test)
-
 # данные для обучения
 triplet_example_df = create_triplet_df(train)
 
 # тестовые данные
 triplet_example_df_test = create_triplet_df(test)
-
 len(triplet_example_df), len(triplet_example_df_test)
+'''
 
 """# Как мы работаем с запросом пользователя
 
@@ -1800,3 +1722,5 @@ exit_sql('31n7-40010', 'model')
 exit_sql('зедуктор на экскаватор 31n7-40010')
 
 """План Б состоит в том. чтобы извлечь из строки название марку и модель - и произвести поиск по совпадениям в базе данных"""
+
+#пока тут ломаем

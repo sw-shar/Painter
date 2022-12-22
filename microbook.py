@@ -413,7 +413,7 @@ baza.to_sql('baza', sqlite3.connect('/tmp/db'), index = False, if_exists = 'repl
 
 
 import re
-def exit_sql(zapros,type_of = 'price'):
+def exit_sql(zapros,type_of = 'price',is_marka_model=False):
   '''
   Функция ищет запрос в баще данных и возращает цену и дополнительные номера
   type_of может быть / model - получаем все модели
@@ -433,14 +433,14 @@ def exit_sql(zapros,type_of = 'price'):
     # вот сюда нужно втыкнуть чтобы он выводил все номера по этому общему номеру
     
     if type_of == 'model':
-      sql =f'select DISTINCT b.marka, b.model from baza as b \
-            where oll_number == (SELECT oll_number from baza where parts_number = "{value}")'
+      sql ='select DISTINCT b.marka, b.model from baza as b \
+            where oll_number == (SELECT oll_number from baza where parts_number = ?)'
     elif type_of == 'number':
-      sql =f'select DISTINCT b.parts_number from baza as b \
-            where oll_number == (SELECT oll_number from baza where parts_number = "{value}")'
+      sql ='select DISTINCT b.parts_number from baza as b \
+            where oll_number == (SELECT oll_number from baza where parts_number = ?)'
     else:
-      sql =f'SELECT DISTINCT name,price, image_url from baza where parts_number = "{value}"'
-    cursor.execute(sql)
+      sql ='SELECT DISTINCT name,price, image_url from baza where parts_number = ?'
+    cursor.execute(sql, (value,))
     
     #ответ
     skins = cursor.fetchall()
@@ -451,4 +451,106 @@ def exit_sql(zapros,type_of = 'price'):
       
     return skins#print((f"{skins[0][0]}. Цена - {skins[0][1]}р. "))
 
+def exit_sql_marka_model(marka, model_prefix, model_suffix):
+  with sqlite3.connect('/tmp/db') as db:
+    cursor = db.cursor()
+  
+    # вот сюда нужно втыкнуть чтобы он выводил все номера по этому общему номеру
+    
+    sql = 'SELECT DISTINCT name,price, image_url from baza where marka = ? and model like ? and model like ?'
+    cursor.execute(sql, (marka, model_prefix + '%', '%' + model_suffix))
+    
+    #ответ
+    skins = cursor.fetchall()
+    cursor.close()
+    
+    if not skins:
+      raise ValueError('Номер не найден')
+      
+    return skins#print((f"{skins[0][0]}. Цена - {skins[0][1]}р. "))
 
+
+class ConvNet(nn.Module):
+    def __init__(self,number_count_,n_tokens=88, emb_size=20, 
+                 kernel_sizes=[2,3,4],):
+        super().__init__()
+        # создаем эмбеддинги собственные
+        self.embeddings = torch.nn.Embedding(n_tokens,emb_size)
+
+        #или берта
+        #self.enconder = bertmodel
+        #создаем сверточные слои
+        convs = [nn.Conv1d(in_channels = emb_size, out_channels = 100, 
+                           kernel_size = kernel_size)
+                         for kernel_size in kernel_sizes] 
+                         
+        self.conv_modules = nn.ModuleList(convs) #лист модулей по которым можно делать цикл
+        # и в этом цикли ты будешь применять одни и теже операции для каждой свертки
+        # и добавлять их в лист фичей feature_list
+        self.drop = nn.Dropout()
+        self.linear = nn.Linear(3*100,number_count_) # линейный слой, 100 выходных каналов у каждого свертоного слоя, и мы их будем конкретенировать
+        self.softmax = nn.Softmax()
+
+    def forward(self,batch):
+        embeddings = self.embeddings(torch.LongTensor(batch['text']))
+        embeddings = embeddings.transpose(1,2) # (batch_size, wordvec_size, sentence_length)
+        
+        feature_list = []
+        for conv in self.conv_modules:
+          feature_map = torch.nn.functional.relu(conv(embeddings))
+          max_pooled , argmax = feature_map.max(dim = 2)
+          feature_list.append(max_pooled)
+
+        features = torch.cat(feature_list, dim=1) #конкретенируем фичи
+        features = self.drop(features)
+        linear = self.linear(features)
+        return linear
+    
+    def predict(self, batch):
+        return self.softmax(self.forward(batch))
+        
+        
+        
+import sys
+def set_module_var(module_name, variable_name, value):
+    #sys.modules["__main__"].__dict__[name] = value
+    setattr(sys.modules[module_name], variable_name, value)
+
+set_module_var('__main__', 'ConvNet', ConvNet)
+    
+
+model = torch.load('data/model_emmbed')
+
+#import pickle
+#with open('data/model_emmbed3.pth', 'rb') as filehandler:
+#    model = pickle.load(filehandler)
+    
+    
+    
+
+import json
+with open('data/class_names') as f: class_names = json.load(f)
+with open('data/token_to_id') as f: token_to_id = json.load(f)
+UNK, PAD = "UNK", "PAD"
+UNK_IX, PAD_IX = map(token_to_id.get, [UNK, PAD])
+
+# review_text = "210lc гидронасос насос"
+def predict_marka_model(review_text,class_names=class_names, max_len=10):
+  '''
+  review_text - запрос
+  class_names - словарь название модели - таргет берта
+  max_len - максимальная длиннна запроса
+  '''
+  stoplist = []
+  sent = [word for word in review_text.split() if word not in stoplist]
+  row_ix = [token_to_id.get(word, UNK_IX) for word in sent[:max_len]]
+  matrix = np.full((1, max_len), np.int32(PAD_IX))
+  matrix[0, :len(row_ix)] = row_ix
+  pr = np.argmax(model.predict({"text" : matrix}).detach().numpy(), axis=1)[0]
+  ix2word = dict(enumerate(class_names))
+  marka, model = ix2word[pr].split('/', maxsplit=1)
+  if '/' in model:
+      prefix, suffix = model.split('/')
+  else:
+      prefix = suffix = model
+  return exit_sql_marka_model(marka, prefix, suffix)

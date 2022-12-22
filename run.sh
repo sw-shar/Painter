@@ -21,7 +21,6 @@ cmd=()
 if [ "$is_debug" ]; then
 	opts+=(
 		-v "$PWD":/app
-		-v "$PWD"/uploads:/uploads
 	)
 	cmd=(
 		env RUN_DEBUG=1 ./flask_run.sh

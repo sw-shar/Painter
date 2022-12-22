@@ -75,64 +75,20 @@ def download_file(style, path_content, *, is_json=True, are_metrics=False,
 
 @APP.route('/forward', methods=['GET', 'POST'])
 def upload_file():
+    answer = None
     if request.method == 'POST':
-        jobid = str(uuid.uuid4())
-        basename = jobid + '.jpg'
-        filename = os.path.join(APP.config['UPLOAD_FOLDER'], basename)
-        is_json = request.content_type.startswith('application/json')
-
-        if is_json:
-            data = request.get_data()
-            try:
-                dic = json.loads(data.decode('utf-8'))
-            except (UnicodeDecodeError, json.decoder.JSONDecodeError):
-                return ERROR_400
-
-            try:
-                style = dic['style']
-                image_base64 = dic['image']
-            except KeyError:
-                return ERROR_400
-
-            try:
-                image_bytes = base64.b64decode(image_base64)
-            except binascii.Error:
-                return ERROR_400
-
-            with open(filename, 'wb') as fileobj:  # write, binary
-                fileobj.write(image_bytes)
-        else:
-            style = request.headers.get('X-Style')
-            if style is None:
-                try:
-                    style = request.form['style']
-                except KeyError:
-                    return ERROR_400
-
-            try:
-                image_file = request.files['image']
-            except KeyError:
-                return ERROR_400
-
-            image_file.save(filename)
-
-        return download_file(
-            style=style,
-            path_content=APP.config["UPLOAD_FOLDER"] + '/' + basename,
-            is_json=is_json,
-            jobid=jobid,
-        )
+        query = request.form['query']
+        answer = f'some answer for {query}'
 
     return f'''
         <!doctype html>
-        <title>Upload new File</title>
-        <h1>Upload new File</h1>
-        <form method=post enctype=multipart/form-data>
-            {make_html_styles()}
-            <input type=file name=image>
+        <title>Query</title>
+        <h1>Query</h1>
+        <form method=post>
+            <input type=text name=query>
             <input type=submit value=Upload>
         </form>
-    '''
+    ''' + ('' if answer is None else f'<p>{answer}</p>')
 
 
 @APP.route('/metadata')

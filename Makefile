@@ -7,7 +7,7 @@ build: requirements.txt
 	DOCKER_BUILDKIT=1 docker build . -t $(IMAGE)
 
 run:
-	./run.sh $(IMAGE) $(CONTAINER)
+	RUN_DEBUG=1 ./run.sh $(IMAGE) $(CONTAINER)
 
 requirements.txt: requirements.in
 	pip-compile --verbose

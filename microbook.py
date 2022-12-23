@@ -379,13 +379,24 @@ def prerare_exel(df,name = 0,group = 1, marka = 3, model = 2, number = 3):
 def number_found(text):
   # регулярка для номеров ХЕндай Дусан Вольво
 
-  reg_z = "[ \t\v\r\n\f]\d{2}[a-z,A-Z]{1}\d{1}[ ,-,‑,-]?\w{5}|\d{2}[n,q,N,Q,N]\w{1}[ ,-,‑,-]?\w{5}|\d{8}|[k,K,к,К]\d{1}[v,V]\w*|\d{2,6}-\d{3,5}|[K,k]?\d{7}|[X,x][a-z,A-Z]{3}[-,‑,-]?\d{5}|\d{3}-\d{2}-\d{3,5}|[ \t\v\r\n\f]\d{2}[a-z,A-Z]{2}[ ,-,‑,-]?\w{5}|[ \t\v\r\n\f][a-z,A-Z,А-Я,а-я]{4}[-,‑,-,-]?\d{5}[ \t\v\r\n\f]|[ \t\v\r\n\f]\d{3}[-,‑,-]?\d{5}"
-  r =re.compile(reg_z)
-  return [i.lower().strip() for i in re.findall(r,text)]
+  reg_z = r"""
+    [ \t\v\r\n\f] \d{2} [a-zA-Z] \d [- ‑]? \w{5}
+    | \d{2}[nqNQN]\w{1}[- ‑]?\w{5}
+    | \d{8}
+    | [kKкК]\d{1}[vV]\w*
+    | \d{2,6}-\d{3,5}
+    | [Kk]?\d{7}
+    | [Xx][a-zA-Z]{3}[-‑]?\d{5}
+    | \d{3}-\d{2}-\d{3,5}
+    | [ \t\v\r\n\f]\d{2}[a-zA-Z]{2}[- ‑]?\w{5}
+    | [ \t\v\r\n\f][a-zA-ZА-Яа-я]{4}[-‑]?\d{5}[ \t\v\r\n\f]
+    | [ \t\v\r\n\f]\d{3}[-‑]?\d{5}
+    """
+  return [i.lower().strip() for i in re.findall(reg_z,text, flags=re.VERBOSE)]
 
 def model_found(text):
   # регулярка для номеров ХЕндай Дусан Вольво
-  reg_z = "[ \t\v\r\n\f]\d{3}[ ,-]?[n,N]?[Л,l, L,л,l][c,C,с,С,c][ ,-]?[7,9]?|[ \t\v\r\n\f]\d{3}[ \$\f\n\r]|[ \t\v\r\n\f][r,R]\d{3}[ ,-]?[w,s,W, ,l, L,л]?[c,C,с,С]?[ ,-]?[5,6,7,9]?[\w][ \t\v\r\n\f]?|[E,E,e,е][c,с,С,C][, ]?\d{3}[\w]?|[b,B,б,Б][l,L,л,Л][, ]?\d{2}[\w,\w]?|[S,s,o,l,a,r]{5}[, ]?\d{3}[, ]?[,l, L,л]?[c,C,с,С]?[-]?\w?|[D,d,Д,д, ][x,X,х,Х,S,s]\d{3}[, ]?[,l, L,л]?[c,C,с,С]?[-]?\w?|[ \t\v\r\n\f]\d{3}[L,C,l,c]{2}[ ,-]?[V,v,A,a]|[r,R,р]\d{3}[ \t\v\r\n\f]|[ \t\v\r\n\f]\w{1}\d{3}"
+  reg_z = r"[ \t\v\r\n\f]\d{3}[ ,-]?[n,N]?[Л,l, L,л,l][c,C,с,С,c][ ,-]?[7,9]?|[ \t\v\r\n\f]\d{3}[ \$\f\n\r]|[ \t\v\r\n\f][r,R]\d{3}[ ,-]?[w,s,W, ,l, L,л]?[c,C,с,С]?[ ,-]?[5,6,7,9]?[\w][ \t\v\r\n\f]?|[E,E,e,е][c,с,С,C][, ]?\d{3}[\w]?|[b,B,б,Б][l,L,л,Л][, ]?\d{2}[\w,\w]?|[S,s,o,l,a,r]{5}[, ]?\d{3}[, ]?[,l, L,л]?[c,C,с,С]?[-]?\w?|[D,d,Д,д, ][x,X,х,Х,S,s]\d{3}[, ]?[,l, L,л]?[c,C,с,С]?[-]?\w?|[ \t\v\r\n\f]\d{3}[L,C,l,c]{2}[ ,-]?[V,v,A,a]|[r,R,р]\d{3}[ \t\v\r\n\f]|[ \t\v\r\n\f]\w{1}\d{3}"
   r =re.compile(reg_z)
   return [i.lower().strip() for i in re.findall(r,text)]
 
@@ -423,15 +434,16 @@ def exit_sql(zapros,type_of = 'price',is_marka_model=False):
   with sqlite3.connect('/tmp/db') as db:
     cursor = db.cursor()
     # выделение номера
-    try:
-      value = list(map(number_found, [zapros.lower()]))[0][0].strip().lower()
-    except:
-      raise ValueError('Номер не найден - переходим к плану Б')
+    values = number_found(zapros.lower())
+    if not values:
+        return None
+
+    value = values[0].strip().lower()
+    if value is None:
+        return None
       
     # формирование запроса
   
-    # вот сюда нужно втыкнуть чтобы он выводил все номера по этому общему номеру
-    
     if type_of == 'model':
       sql ='select DISTINCT b.marka, b.model from baza as b \
             where oll_number == (SELECT oll_number from baza where parts_number = ?)'
@@ -439,17 +451,14 @@ def exit_sql(zapros,type_of = 'price',is_marka_model=False):
       sql ='select DISTINCT b.parts_number from baza as b \
             where oll_number == (SELECT oll_number from baza where parts_number = ?)'
     else:
-      sql ='SELECT DISTINCT name,price, image_url from baza where parts_number = ?'
+      sql ='SELECT DISTINCT name,marka, model, price, image_url from baza where parts_number = ?'
     cursor.execute(sql, (value,))
     
     #ответ
     skins = cursor.fetchall()
     cursor.close()
     
-    if not skins:
-      raise ValueError('Номер не найден - переходим к плану Б')
-      
-    return skins#print((f"{skins[0][0]}. Цена - {skins[0][1]}р. "))
+    return skins
 
 def exit_sql_marka_model(marka, model_prefix, model_suffix):
   with sqlite3.connect('/tmp/db') as db:
@@ -457,18 +466,14 @@ def exit_sql_marka_model(marka, model_prefix, model_suffix):
   
     # вот сюда нужно втыкнуть чтобы он выводил все номера по этому общему номеру
     
-    sql = 'SELECT DISTINCT name,price, image_url from baza where marka = ? and model like ? and model like ?'
+    sql = 'SELECT DISTINCT name,marka,model,price, image_url from baza where marka = ? and model like ? and model like ?'
     cursor.execute(sql, (marka, model_prefix + '%', '%' + model_suffix))
     
     #ответ
     skins = cursor.fetchall()
     cursor.close()
-    
-    if not skins:
-      raise ValueError('Номер не найден')
       
-    return skins#print((f"{skins[0][0]}. Цена - {skins[0][1]}р. "))
-
+    return skins
 
 class ConvNet(nn.Module):
     def __init__(self,number_count_,n_tokens=88, emb_size=20, 
@@ -507,10 +512,7 @@ class ConvNet(nn.Module):
         return linear
     
     def predict(self, batch):
-        return self.softmax(self.forward(batch))
-        
-        
-        
+        return self.softmax(self.forward(batch))        
 import sys
 def set_module_var(module_name, variable_name, value):
     #sys.modules["__main__"].__dict__[name] = value
@@ -518,8 +520,10 @@ def set_module_var(module_name, variable_name, value):
 
 set_module_var('__main__', 'ConvNet', ConvNet)
     
-
-model = torch.load('data/model_emmbed')
+#import __main__
+#setattr(__main__, "ConvNet", ConvNet)
+#nnmodel = torch.load('data/model_emmbed3.pth', map_location=torch.device("cpu"))
+nnmodel = torch.load('data/model_emmbed')
 
 #import pickle
 #with open('data/model_emmbed3.pth', 'rb') as filehandler:
@@ -535,18 +539,19 @@ UNK, PAD = "UNK", "PAD"
 UNK_IX, PAD_IX = map(token_to_id.get, [UNK, PAD])
 
 # review_text = "210lc гидронасос насос"
-def predict_marka_model(review_text,class_names=class_names, max_len=10):
+def predict_marka_model(review_text, max_len=10):
   '''
   review_text - запрос
   class_names - словарь название модели - таргет берта
   max_len - максимальная длиннна запроса
   '''
+  # TODO: return value
   stoplist = []
   sent = [word for word in review_text.split() if word not in stoplist]
   row_ix = [token_to_id.get(word, UNK_IX) for word in sent[:max_len]]
   matrix = np.full((1, max_len), np.int32(PAD_IX))
   matrix[0, :len(row_ix)] = row_ix
-  pr = np.argmax(model.predict({"text" : matrix}).detach().numpy(), axis=1)[0]
+  pr = np.argmax(nnmodel.predict({"text" : matrix}).detach().numpy(), axis=1)[0]
   ix2word = dict(enumerate(class_names))
   marka, model = ix2word[pr].split('/', maxsplit=1)
   if '/' in model:

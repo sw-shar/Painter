@@ -46,6 +46,7 @@ def make_answer(query):
     rows = method_rows['rows']
 
     name, marka, model, price, image_url = rows[0]
+    # TODO: all rows
     print(rows)
     return {
         "name": name,
@@ -56,6 +57,28 @@ def make_answer(query):
     }
 
 
+def query_answer_to_log_row(query, answer):
+    """
+    >>> query_answer_to_log_row('abc', {'error': 'oh'})
+    '"abc","oh"'
+
+    >>> query_answer_to_log_row('abc', {'name': 'imya', 'price': 123})
+    '"abc","","imya","123"'
+    """
+    row = [query, '']
+    if 'error' in answer:
+        row[1] = answer['error']
+    else:
+        row += answer.values()
+    return ','.join('"' + str(x).replace('"', '""') + '"' for x in row)
+
+
+def log_answer(query, answer):
+    row_str = query_answer_to_log_row(query, answer)
+    with open('app-log.csv', 'a') as file:
+        file.write(row_str + '\n')
+
+
 @APP.route("/", methods=["GET", "POST"])
 def upload_file():
     query = None
@@ -63,6 +86,7 @@ def upload_file():
     if flask.request.method == "POST":
         query = flask.request.form["query"]
         answer = make_answer(query)
+        log_answer(query, answer)
         # TODO: logging
 
     # return str(answer)

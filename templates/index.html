@@ -1,5 +1,35 @@
 <!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.split {
+  height: 100%;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  overflow-x: hidden;
+  padding: 10px;
+  padding-top: 20px;
+}
+
+.left {
+  left: 0;
+  width: 60%;
+  /*background-color: #999;*/
+}
+
+.right {
+  right: 0;
+  width: 40%;
+  /*background-color: #777;*/
+}
+</style>
         <title>Запрос к базе данных</title>
+</head>
+<body>
+
+<div class="split left">
         <h1>Ввод</h1>
 <p>введите свой запрос:</p> 
         <form method=post>
@@ -15,8 +45,9 @@
 	<p>{{name}}: <b>{{marka }} {{model }} </b>Цена: <b>{{ price }}</b></p>
 	<p><img src="{{image_url}}" width="300" ></p>
 	{% endif %}
+</div>
 
-	<hr>
+<div class="split right">
 
        <h2>Этот проект создан в рамках диплома магистерской программы ВШЭ</h2>
 <h4>Программа обучения - Машинное обучение и высоконагруженные системы. 2022 год</h4>
@@ -87,3 +118,9 @@
   <p>Flask</p>
    <p>Регулярные выражения(regexp)</p>
  <p> Docker </p>  
+</div>
+     
+</body>
+</html> 
+
+

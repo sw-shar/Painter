@@ -1,4 +1,5 @@
 import sqlite3
+import re
 import pandas as pd
 import numpy as np
 import math
@@ -587,22 +588,16 @@ def cifra(text):
 
 
 # загружаем нашу базу из файла
-baza = pd.DataFrame(
-    prerare_exel(pd.read_csv("data/parts_mainpump.csv", index_col=False)),
-    columns=["name", "marka", "model", "parts_number", "image_url", "price"],
+baza = pd.read_csv(
+    "data/baza!!!.csv",
 )
-
-
-baza.query('parts_number == "401-00059"')
 
 """### Пример работы"""
 
-import sqlite3
 
 baza.to_sql("baza", sqlite3.connect("/tmp/db"), index=False, if_exists="replace")
 
 
-import re
 
 
 def exit_sql(zapros, type_of="price", is_marka_model=False):
@@ -760,3 +755,66 @@ def predict_marka_model(review_text, max_len=10):
     else:
         prefix = suffix = model
     return exit_sql_marka_model(marka, prefix, suffix)
+
+
+# METHOD 3
+
+import transformers
+from transformers import (
+    BertModel,
+    BertTokenizer,
+    AdamW,
+    get_linear_schedule_with_warmup,
+)
+
+PRE_TRAINED_MODEL_NAME = "bert-base-cased"
+tokenizer = BertTokenizer.from_pretrained(PRE_TRAINED_MODEL_NAME)
+
+
+class SentimentClassifier(nn.Module):
+    def __init__(self, n_classes):
+        super(SentimentClassifier, self).__init__()
+        self.bert = BertModel.from_pretrained(PRE_TRAINED_MODEL_NAME)
+        self.drop = nn.Dropout(p=0.3)
+        self.out = nn.Linear(self.bert.config.hidden_size, n_classes)
+
+    def forward(self, input_ids, attention_mask):
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        output = self.drop(outputs["pooler_output"])
+        return self.out(output)
+
+
+set_module_var("__main__", "SentimentClassifier", SentimentClassifier)
+model_name = torch.load("data/model_name", map_location=torch.device("cpu"))
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+with open("data/ix2word_name") as f:
+    class_names3 = json.load(f)
+
+
+def predict_group(tokenizer, model_name, review):
+    """
+    Функция для предсказания группы
+    """
+    encoding = tokenizer.encode_plus(
+        review,
+        add_special_tokens=True,
+        max_length=100,
+        return_token_type_ids=False,
+        pad_to_max_length=True,
+        truncation=True,
+        return_attention_mask=True,
+        return_tensors="pt",
+    )
+    outputs = model_name(
+        input_ids=encoding["input_ids"].to(device),
+        attention_mask=encoding["attention_mask"].to(device),
+    )
+    _, preds = torch.max(outputs, dim=1)
+    ix2word = class_names3
+    return ix2word[str(preds[0].cpu().item())]
+
+
+def predict_group_for_query(query):
+    return predict_group(tokenizer, model_name, query)

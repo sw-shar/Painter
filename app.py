@@ -19,21 +19,30 @@ APP = flask.Flask(__name__)
 def make_method_rows(query):
     """
     >>> make_method_rows("400914-00212")  # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    {'method': 'sql', 'rows': [('Насос основной', 'Doosan', 'dx225', 220000, ...)]}
+    {'group': 'насос/',
+     'method': 'sql',
+     'rows': [('Насос основной', 'Doosan', 'dx225', 220000, ...)]}
 
     >>> make_method_rows("r160lc-7")  # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    {'method': 'predict', 
+    {'group': 'насос/',
+     'method': 'predict', 
      'rows': [('Насос основной', 'Hyundai', 'r160lc-9', 150000, ...), 
               ('Редуктор хода', 'Hyundai', 'r160lc-9', 180000, ...)]}
+
+    >>> make_method_rows("")  # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    {'group': 'редуктор/запчасти', 'method': 'predict', 'rows': [(...
     """
+    group = microbook.predict_group_for_query(query)
+
     method = "sql"
     rows = microbook.exit_sql(query)
     if not rows:
         method = 'predict'
         rows = microbook.predict_marka_model(query)
         if not rows:
-            return {"error": 'not found'}
-    return {'method': method, 'rows': rows}
+            return {'group': group, "error": 'not found'}
+
+    return {'group': group, 'method': method, 'rows': rows}
 
 
 def make_answer(query):
@@ -41,6 +50,9 @@ def make_answer(query):
         method_rows = make_method_rows(query)
     except Exception as exc:
         return {"error": str(exc)}
+
+    if 'error' in method_rows:
+        return method_rows
 
     method = method_rows['method']
     rows = method_rows['rows']
@@ -87,7 +99,6 @@ def upload_file():
         query = flask.request.form["query"]
         answer = make_answer(query)
         log_answer(query, answer)
-        # TODO: logging
 
     # return str(answer)
     return INDEX_TEMPLATE.render(query=query, **answer)
